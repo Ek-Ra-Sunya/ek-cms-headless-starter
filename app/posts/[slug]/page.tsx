@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { getPost } from '@/lib/ekcms';
+import { isHtml, sanitizeHtml } from '@/lib/sanitize-html';
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -12,17 +13,21 @@ export default async function PostPage({ params }: Props) {
   const post = await getPost((await params).slug);
   if (!post) notFound();
   const { title, coverImageUrl, publishedAt, body, content } = post.data;
-  // `body` is plain text with paragraphs separated by blank lines.
-  const paragraphs = (body ?? content ?? '').split(/\n\s*\n/).filter(Boolean);
+  const text = body ?? content ?? '';
   return (
     <article>
       <h1>{title}</h1>
       <time dateTime={publishedAt ?? post.createdAt}>{new Date(publishedAt ?? post.createdAt).toDateString()}</time>
       {/* eslint-disable-next-line @next/next/no-img-element -- CMS image URLs are presigned and short-lived */}
       {coverImageUrl && <img src={coverImageUrl} alt="" />}
-      {paragraphs.map((p, i) => (
-        <p key={i}>{p}</p>
-      ))}
+      {isHtml(text) ? (
+        <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(text) }} />
+      ) : (
+        text
+          .split(/\n\s*\n/)
+          .filter(Boolean)
+          .map((p, i) => <p key={i}>{p}</p>)
+      )}
     </article>
   );
 }

@@ -35,7 +35,7 @@ function env(name: string): string {
   return value;
 }
 
-type Envelope<T> = { data: T; meta?: { total: number } };
+type Envelope<T> = { data: T; meta?: { total: number; hasMore: boolean } };
 
 /** GETs one API path and returns its `{ data, meta }` envelope. Returns null on 404. */
 async function request<T>(path: string): Promise<Envelope<T> | null> {
@@ -56,8 +56,15 @@ const seg = encodeURIComponent;
 export const getSiteConfig = () => get<SiteConfig>('/site-config');
 export const getMenu = async () => (await get<MenuItem[]>('/menu-items')) ?? [];
 export const getPage = (slug: string) => get<Page>(`/pages/${seg(slug)}`);
-export const listPosts = async () => (await get<Post[]>('/posts?type=blog&limit=20')) ?? [];
 export const getPost = (slug: string) => get<Post>(`/posts/by-slug/${seg(slug)}`);
+
+export const POSTS_PER_PAGE = 20;
+
+/** One page (1-based) of published blog posts, newest first, with `hasMore` for paging. */
+export async function listPosts(page: number) {
+  const res = await request<Post[]>(`/posts?type=blog&limit=${POSTS_PER_PAGE}&offset=${(page - 1) * POSTS_PER_PAGE}`);
+  return { posts: res?.data ?? [], hasMore: res?.meta?.hasMore ?? false };
+}
 
 export async function getSections(pageId: string): Promise<Section[]> {
   const rows = (await get<Section[]>(`/pages/${seg(pageId)}/sections`)) ?? [];

@@ -14,7 +14,7 @@ A key can be revoked on the same page. It stops working at once.
 
 ## Setup
 
-Requires Node.js 20.9 or newer and pnpm.
+Requires pnpm and Node.js 22.22.2 or later on 22, or 24.15 or later.
 
 ```bash
 pnpm install
@@ -40,7 +40,7 @@ pnpm dev
 | --- | --- |
 | `/` | `/pages/home`, or the oldest page from `/pages` if there is none, then its sections |
 | `/[slug]` | `/pages/:slug`, `/pages/:pageId/sections` |
-| `/posts` | `/posts?type=blog` |
+| `/posts?page=` | `/posts?type=blog`, 20 per page with Next and Previous links |
 | `/posts/[slug]` | `/posts/by-slug/:slug` |
 | every page | `/site-config`, `/menu-items` |
 
