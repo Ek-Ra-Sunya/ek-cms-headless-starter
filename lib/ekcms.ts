@@ -35,8 +35,10 @@ function env(name: string): string {
   return value;
 }
 
-/** GETs one API path and unwraps the `{ data }` envelope. Returns null on 404. */
-async function get<T>(path: string): Promise<T | null> {
+type Envelope<T> = { data: T; meta?: { total: number } };
+
+/** GETs one API path and returns its `{ data, meta }` envelope. Returns null on 404. */
+async function request<T>(path: string): Promise<Envelope<T> | null> {
   const res = await fetch(`${env('EKCMS_API_URL')}${path}`, {
     headers: { 'x-site-id': env('EKCMS_SITE'), 'x-api-key': env('EKCMS_API_KEY') },
     next: { revalidate: REVALIDATE },
@@ -44,14 +46,15 @@ async function get<T>(path: string): Promise<T | null> {
   if (res.status === 404) return null;
   const body = await res.json().catch(() => null);
   if (!res.ok) throw new EkcmsError(res.status, body?.code ?? 'UNKNOWN', body?.message ?? res.statusText);
-  return body.data as T;
+  return body as Envelope<T>;
 }
+
+const get = async <T>(path: string) => (await request<T>(path))?.data ?? null;
 
 const seg = encodeURIComponent;
 
 export const getSiteConfig = () => get<SiteConfig>('/site-config');
 export const getMenu = async () => (await get<MenuItem[]>('/menu-items')) ?? [];
-export const listPages = async () => (await get<Page[]>('/pages?limit=100')) ?? [];
 export const getPage = (slug: string) => get<Page>(`/pages/${seg(slug)}`);
 export const listPosts = async () => (await get<Post[]>('/posts?type=blog&limit=20')) ?? [];
 export const getPost = (slug: string) => get<Post>(`/posts/by-slug/${seg(slug)}`);
@@ -61,8 +64,12 @@ export async function getSections(pageId: string): Promise<Section[]> {
   return rows.sort((a, b) => a.order - b.order);
 }
 
-/** The page named "home", else the oldest published page. */
+/** The page with slug "home", else the oldest published page. */
 export async function getHomePage(): Promise<Page | null> {
-  const pages = await listPages();
-  return pages.find((p) => p.slug === 'home') ?? [...pages].sort((a, b) => (a.createdAt ?? '').localeCompare(b.createdAt ?? ''))[0] ?? null;
+  const home = await getPage('home');
+  if (home) return home;
+  // /pages lists newest first, so the oldest page is the last one.
+  const total = (await request<Page[]>('/pages?limit=1'))?.meta?.total ?? 0;
+  if (total === 0) return null;
+  return (await get<Page[]>(`/pages?limit=1&offset=${total - 1}`))?.[0] ?? null;
 }

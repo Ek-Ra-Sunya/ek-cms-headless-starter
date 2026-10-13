@@ -38,7 +38,7 @@ pnpm dev
 
 | Route | API calls |
 | --- | --- |
-| `/` | `/pages`, then the sections of the page with slug `home` (or the oldest page) |
+| `/` | `/pages/home`, or the oldest page from `/pages` if there is none, then its sections |
 | `/[slug]` | `/pages/:slug`, `/pages/:pageId/sections` |
 | `/posts` | `/posts?type=blog` |
 | `/posts/[slug]` | `/posts/by-slug/:slug` |
