@@ -34,6 +34,7 @@ pnpm dev
 - `lib/ekcms.ts` is the only file that talks to the API. It imports `server-only`, so the build fails if a client component imports it, and the key never reaches the browser.
 - Every fetch is cached for 300 seconds (`next: { revalidate }`). Change `REVALIDATE` to suit how often you publish.
 - Pages render per request, so `pnpm build` needs no credentials. API responses still come from the cache.
+- List endpoints are paginated (20 items by default, at most 100 per request). `list()` in `lib/ekcms.ts` fetches one page and `listAll()` follows `meta.hasMore` until it has every item, which is how all of a page's sections are loaded.
 - `app/Sections.tsx` renders each section's heading and text and shows its raw data. Replace it with your own component per section `type`.
 
 | Route | API calls |

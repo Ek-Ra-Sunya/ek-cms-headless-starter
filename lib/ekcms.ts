@@ -51,9 +51,34 @@ async function request<T>(path: string): Promise<Envelope<T> | null> {
 
 const get = async <T>(path: string) => (await request<T>(path))?.data ?? null;
 
+/** The most a list endpoint returns per request (PaginationQueryDto caps limit at 100). */
+const MAX_LIMIT = 100;
+
+/**
+ * Every paginated list fetch goes through here: one page of `path`. The API
+ * defaults to 20 items when no limit is sent, so callers always pass one.
+ */
+async function list<T>(path: string, limit: number, offset = 0) {
+  const sep = path.includes('?') ? '&' : '?';
+  const res = await request<T[]>(`${path}${sep}limit=${limit}&offset=${offset}`);
+  return { items: res?.data ?? [], total: res?.meta?.total ?? 0, hasMore: res?.meta?.hasMore ?? false };
+}
+
+/** Every item of a paginated list, following `hasMore` at the largest page size. */
+async function listAll<T>(path: string): Promise<T[]> {
+  const all: T[] = [];
+  for (let more = true; more; ) {
+    const page = await list<T>(path, MAX_LIMIT, all.length);
+    all.push(...page.items);
+    more = page.hasMore && page.items.length > 0;
+  }
+  return all;
+}
+
 const seg = encodeURIComponent;
 
 export const getSiteConfig = () => get<SiteConfig>('/site-config');
+/** The menu is one tree, not a paginated list. */
 export const getMenu = async () => (await get<MenuItem[]>('/menu-items')) ?? [];
 export const getPage = (slug: string) => get<Page>(`/pages/${seg(slug)}`);
 export const getPost = (slug: string) => get<Post>(`/posts/by-slug/${seg(slug)}`);
@@ -62,12 +87,13 @@ export const POSTS_PER_PAGE = 20;
 
 /** One page (1-based) of published blog posts, newest first, with `hasMore` for paging. */
 export async function listPosts(page: number) {
-  const res = await request<Post[]>(`/posts?type=blog&limit=${POSTS_PER_PAGE}&offset=${(page - 1) * POSTS_PER_PAGE}`);
-  return { posts: res?.data ?? [], hasMore: res?.meta?.hasMore ?? false };
+  const { items, hasMore } = await list<Post>('/posts?type=blog', POSTS_PER_PAGE, (page - 1) * POSTS_PER_PAGE);
+  return { posts: items, hasMore };
 }
 
+/** All sections of a page, in editor order. */
 export async function getSections(pageId: string): Promise<Section[]> {
-  const rows = (await get<Section[]>(`/pages/${seg(pageId)}/sections`)) ?? [];
+  const rows = await listAll<Section>(`/pages/${seg(pageId)}/sections`);
   return rows.sort((a, b) => a.order - b.order);
 }
 
@@ -76,7 +102,7 @@ export async function getHomePage(): Promise<Page | null> {
   const home = await getPage('home');
   if (home) return home;
   // /pages lists newest first, so the oldest page is the last one.
-  const total = (await request<Page[]>('/pages?limit=1'))?.meta?.total ?? 0;
+  const { total } = await list<Page>('/pages', 1);
   if (total === 0) return null;
-  return (await get<Page[]>(`/pages?limit=1&offset=${total - 1}`))?.[0] ?? null;
+  return (await list<Page>('/pages', 1, total - 1)).items[0] ?? null;
 }
