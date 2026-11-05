@@ -1,0 +1,48 @@
+name: CI
+
+# Runs on promote PRs into main only, never on feature PRs. Reads no secrets, never deploys.
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    # Never run fork PR code on the shared self-hosted runner.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    # The org has no GitHub-hosted minutes. A site copied from this template should
+    # change this to its own runner label.
+    runs-on: [self-hosted, deploy]
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node and pnpm
+        run: |
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" && (nvm use 22 >/dev/null 2>&1 || nvm use default >/dev/null 2>&1 || true)
+          corepack enable >/dev/null 2>&1 || true
+          command -v pnpm >/dev/null 2>&1 || npm install -g pnpm
+          dirname "$(command -v node)" >> "$GITHUB_PATH"
+          dirname "$(command -v pnpm)" >> "$GITHUB_PATH"
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Lint and typecheck
+        run: pnpm lint && pnpm typecheck
+      - name: Build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+        run: pnpm build
+      - name: QA gates
+        # Headers and CSP, hex colours, reduced motion, bundle budget.
+        # Budgets and known gaps live in scripts/qa/baseline.json.
+        run: pnpm qa

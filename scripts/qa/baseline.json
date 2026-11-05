@@ -1,0 +1,18 @@
+{
+  "hex": {},
+  "motion": [],
+  "headers": {
+    "required": [
+      "Content-Security-Policy",
+      "X-Content-Type-Options",
+      "Referrer-Policy",
+      "frame"
+    ],
+    "gaps": []
+  },
+  "bundle": {
+    "jsGz": 196000,
+    "cssGz": 2000,
+    "maxChunkGz": 78000
+  }
+}
